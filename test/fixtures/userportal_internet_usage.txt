@@ -1,0 +1,7 @@
+User portal for 24abc001
+Internet usage
+CurrentDailyCycle usage information
+	Allotted	Up to last session	Current session	Total	Remaining
+Cycle upload network traffic	N.A.	0 MB	1.02 MB	1.02 MB	N.A.
+Cycle download network traffic	N.A.	0 MB	12.57 MB	12.57 MB	N.A.
+Cycle total network traffic	13312 MB	0 MB	13.59 MB	13.59 MB	13298.41 MB

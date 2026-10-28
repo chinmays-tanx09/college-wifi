@@ -1,0 +1,9 @@
+-keep class bot.paradox.wifi.V5Test { *; }
+-keep class bot.paradox.wifi.V5Test$* { *; }
+-keep class bot.paradox.wifi.UpdTest { *; }
+-dontobfuscate
+-dontwarn **
+-keep class bot.paradox.wifi.Hang51Test { *; }
+-keep class bot.paradox.wifi.Hang51Test$* { *; }
+-keep class bot.paradox.wifi.Repro51 { *; }
+-keep class bot.paradox.wifi.H51 { *; }

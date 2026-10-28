@@ -1,0 +1,6 @@
+<network-security-config>
+ <!-- v5: captive portals live on arbitrary campus hosts and many only speak plain HTTP, so cleartext must be allowed.
+      Credentials are still only sent to the portal host confirmed for that SSID (Http.allowedHosts), and the updater
+      refuses anything that isn't HTTPS in code. User-added CAs are not trusted. -->
+ <base-config cleartextTrafficPermitted="true"><trust-anchors><certificates src="system"/></trust-anchors></base-config>
+</network-security-config>
