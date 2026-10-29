@@ -123,7 +123,7 @@ public final class MainActivity extends Activity {
   LinearLayout head=new LinearLayout(this);head.setOrientation(LinearLayout.HORIZONTAL);head.setGravity(Gravity.CENTER_VERTICAL);head.setPadding(Ui.dp(this,24),Ui.dp(this,28),Ui.dp(this,20),Ui.dp(this,20));
   FrameLayout mark=new FrameLayout(this);GradientDrawable mg=new GradientDrawable();mg.setShape(GradientDrawable.OVAL);mg.setColor(p.primary);mark.setBackground(mg);ImageView mi=new ImageView(this);mi.setImageDrawable(Ui.icon(this,R.drawable.ic_wifi,p.onPrimary));mark.addView(mi,new FrameLayout.LayoutParams(Ui.dp(this,22),Ui.dp(this,22),Gravity.CENTER));
   head.addView(mark,new LinearLayout.LayoutParams(Ui.dp(this,44),Ui.dp(this,44)));
-  LinearLayout names=new LinearLayout(this);names.setOrientation(LinearLayout.VERTICAL);names.setPadding(Ui.dp(this,14),0,0,0);names.addView(Ui.text(this,"College WiFi",19,750,p.text,-0.01f));TextView ver=Ui.caption(this,p,"Version 5.2");names.addView(ver,Ui.lp(-2,-2,4,this));head.addView(names,new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout names=new LinearLayout(this);names.setOrientation(LinearLayout.VERTICAL);names.setPadding(Ui.dp(this,14),0,0,0);names.addView(Ui.text(this,"College WiFi",19,750,p.text,-0.01f));TextView ver=Ui.caption(this,p,"Version 5.3");names.addView(ver,Ui.lp(-2,-2,4,this));head.addView(names,new LinearLayout.LayoutParams(0,-2,1));
   drawer.addView(head);
   ScrollView sv=new ScrollView(this);drawerScroll=sv;sv.setVerticalScrollBarEnabled(false);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);list.setPadding(Ui.dp(this,10),Ui.dp(this,4),Ui.dp(this,12),Ui.dp(this,16));sv.addView(list);drawer.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
   list.addView(sectionLabel("Connection"));
@@ -310,7 +310,7 @@ public final class MainActivity extends Activity {
  void kv(LinearLayout card,String k,String v,boolean div){TextView kt=Ui.text(this,k,12.5f,700,p.faint,0.03f);card.addView(kt);TextView vt=Ui.text(this,v,15,550,p.text,0f);card.addView(vt,Ui.lp(-1,-2,6,this));
   if(div){View d=Ui.divider(this,p,0);((LinearLayout.LayoutParams)d.getLayoutParams()).topMargin=Ui.dp(this,14);((LinearLayout.LayoutParams)d.getLayoutParams()).bottomMargin=Ui.dp(this,14);card.addView(d);}}
  void pageAbout(LinearLayout col){lead(col,"Signs you in to college Wi-Fi the moment the portal asks, then gets out of the way.");
-  LinearLayout card=Ui.card(this,p);kv(card,"Version",Updater.myName(this).isEmpty()?"5.2":Updater.myName(this),true);kv(card,"Made by",Dev.NAME,true);kv(card,"How it works","No timers and no polling. Android tells the app when it sees a login portal on a saved Wi-Fi (the same signal behind “Sign in to Wi-Fi network”), and it signs in right then with your first account that works.",true);
+  LinearLayout card=Ui.card(this,p);kv(card,"Version",Updater.myName(this).isEmpty()?"5.3":Updater.myName(this),true);kv(card,"Made by",Dev.NAME,true);kv(card,"How it works","No timers and no polling. Android tells the app when it sees a login portal on a saved Wi-Fi (the same signal behind “Sign in to Wi-Fi network”), and it signs in right then with your first account that works.",true);
   kv(card,"Privacy","Logins are encrypted on this phone (Android Keystore, AES-GCM) and only ever sent to the portal you confirmed for that Wi-Fi. Plain-HTTP portals send them unencrypted over the campus network; the app can't change that.",false);col.addView(card,Ui.lp(-1,-2,28,this));
   LinearLayout uc=Ui.card(this,p);uc.setPadding(Ui.dp(this,4),Ui.dp(this,6),Ui.dp(this,4),Ui.dp(this,6));LinearLayout ur=Ui.row(this,p,R.drawable.ic_update,"Check for updates",Store.p(this).getString("upd_line",null),false,null);ur.setClickable(true);
   ur.setOnClickListener(v->{if(PREVIEW)return;toast("Checking…");final android.content.Context a=getApplicationContext();new Thread(()->{String line=Updater.check(a,true);Store.p(a).edit().putString("upd_line",line).apply();runOnUiThread(()->{toast(line);if("about".equals(page))showPage("about",false);});}).start();});uc.addView(ur);col.addView(uc,Ui.lp(-1,-2,16,this));
@@ -446,7 +446,7 @@ public final class MainActivity extends Activity {
   // breakdown
   LinearLayout d=Ui.card(this,p);
   kv(d,"This phone today","\u2193 "+Usage.bytes(v.phoneDown)+"   \u2191 "+Usage.bytes(v.phoneUp)+"   = "+Usage.bytes(v.phone())+(v.precise?"":"  (approx)"),true);
-  if(v.portal!=null)kv(d,"Campus account today (all devices)","\u2193 "+Usage.bytes(Math.max(0,v.portal.down))+"   \u2191 "+Usage.bytes(Math.max(0,v.portal.up))+"   = "+Usage.bytes(v.portal.used())+(v.portal.cap()>0?" of "+Usage.bytes(v.portal.cap()):""),true);
+  if(v.portal!=null)kv(d,"Campus account today (all devices)",(v.portal.down>0||v.portal.up>0?"\u2193 "+Usage.bytes(Math.max(0,v.portal.down))+"   \u2191 "+Usage.bytes(Math.max(0,v.portal.up))+"   = ":"")+""+Usage.bytes(v.portal.used())+(v.portal.cap()>0?" of "+Usage.bytes(v.portal.cap()):""),true);
   kv(d,"Left today",v.left>=0?Usage.bytes(v.left,v.cap)+(v.fromPortal?" (campus quota)":" (your cap)"):"No cap set",false);
   col.addView(d,Ui.lp(-1,-2,14,this));
   // history
