@@ -20,7 +20,7 @@ final class PortalUsage {
   long left(){if(remaining>=0&&remaining!=UNLIMITED)return remaining;long c=cap(),u=used();return c>0&&u>=0?Math.max(0,c-u):NA;}
   boolean daily(){return "daily".equals(period);}
   String save(){return allotted+","+upToLast+","+current+","+total+","+remaining+","+down+","+up+","+period;}
-  static Quota load(String s){if(s==null)return null;String[] f=s.split(",");if(f.length!=8)return null;Quota q=new Quota();try{q.allotted=Long.parseLong(f[0]);q.upToLast=Long.parseLong(f[1]);q.current=Long.parseLong(f[2]);q.total=Long.parseLong(f[3]);q.remaining=Long.parseLong(f[4]);q.down=Long.parseLong(f[5]);q.up=Long.parseLong(f[6]);q.period=f[7];}catch(Exception e){return null;}return q.ok()?q:null;}
+  static Quota load(String s){if(s==null)return null;String[] f=s.split(",");if(f.length!=8)return null;Quota q=new Quota();try{q.allotted=Long.parseLong(f[0]);q.upToLast=Long.parseLong(f[1]);q.current=Long.parseLong(f[2]);q.total=Long.parseLong(f[3]);q.remaining=Long.parseLong(f[4]);q.down=Long.parseLong(f[5]);q.up=Long.parseLong(f[6]);q.period=f[7];}catch(Exception e){return null;}fixup(q);return q.ok()?q:null;}
  }
  static String norm(String s){return s==null?"":s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]","");}
  /** "13312 MB" → bytes; "N.A." / "-" / "" → NA; "Unlimited" → UNLIMITED. A bare number is MB (the portal's unit). */
@@ -52,7 +52,14 @@ final class PortalUsage {
    else if("down".equals(kind))q.down=tot;else q.up=tot;}
   if(!any&&q.down>=0&&q.up>=0){q.total=q.down+q.up;any=true;}
   if(!any)return null;if(q.total<0&&q.upToLast>=0&&q.current>=0)q.total=q.upToLast+q.current;
-  return q.ok()?q:null;}
+  fixup(q);return q.ok()?q:null;}
+ /** v5.3: a real portal read (Oct 29) put the cap in Total and the used amount in Allotted ("Used 13 GB of 1.7 GB").
+  *  The cap is always the largest of allotted/total/remaining and used + left = cap, so re-seat them when they disagree. */
+ static void fixup(Quota q){long a=q.allotted,t=q.total,r=q.remaining;
+  if(a>0&&a!=UNLIMITED&&t>=0&&r>=0&&r!=UNLIMITED){long cap=Math.max(a,Math.max(t,r));long tol=Math.max(5L*Usage.MB,cap/50);
+   if(Math.abs(a-(t+r))>tol){long left=r!=cap?r:Math.min(a,t);q.allotted=cap;q.remaining=left;q.total=Math.max(0,cap-left);}}
+  else if(a>0&&a!=UNLIMITED&&t>a){long x=a;q.allotted=t;q.total=x;}
+  if(q.down<=0&&q.up<=0){q.down=NA;q.up=NA;}}
  static boolean isHeader(List<String> r){boolean a=false,rem=false;for(String c:r){String n=norm(c);if(n.equals("allotted"))a=true;if(n.equals("remaining"))rem=true;}return a&&rem;}
  /** Column index (in the header row) of Allotted, Up to last session, Current session, Total, Remaining. */
  static int[] columns(List<String> h){int[] c={-1,-1,-1,-1,-1};for(int i=0;i<h.size();i++){String n=norm(h.get(i));
