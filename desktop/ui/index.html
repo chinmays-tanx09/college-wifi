@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" data-theme="system">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>College WiFi</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app" id="app" data-sidebar="closed">
+  <div class="scrim" id="scrim"></div>
+  <aside class="sidebar" aria-label="Menu">
+    <div class="sb-top">
+      <img class="sb-logo" src="icon.png" alt=""><span class="sb-name">College WiFi</span><span class="spacer"></span>
+      <button class="icon-btn" id="sbClose" title="Close sidebar (Ctrl+B)" aria-label="Close sidebar"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="home"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.6a10 10 0 0 1 14 0"/><path d="M8.5 16.3a5 5 0 0 1 7 0"/><circle cx="12" cy="19.6" r="0.6"/></svg><span>Status</span></button>
+      <button class="nav-item" data-view="usage"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg><span>Usage</span></button>
+      <button class="nav-item" data-view="account"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg><span>Account</span></button>
+      <button class="nav-item" data-view="settings"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Settings</span></button>
+      <button class="nav-item" data-view="about"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r="0.6"/></svg><span>About</span></button>
+    </nav>
+    <div class="sb-foot">
+      <div class="avatar" id="avatar"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></div>
+      <div class="who"><div class="who-name" id="whoName">No login saved</div><div class="who-sub" id="whoSub">Account → add your login</div></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="sbToggle" title="Open sidebar" aria-label="Open sidebar"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
+      <div class="brand" id="brand">College WiFi</div>
+      <div class="spacer"></div>
+      <button class="icon-btn" id="refreshBtn" title="Check now" aria-label="Check now"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+    </header>
+
+    <section class="view active" id="view-home">
+      <div class="hero" data-state="offline">
+        <div class="ring-wrap">
+          <svg class="ring" viewBox="0 0 240 240" aria-hidden="true">
+            <circle class="ring-track" cx="120" cy="120" r="110" />
+            <circle class="ring-arc" id="ringArc" cx="120" cy="120" r="110" />
+          </svg>
+          <button class="power" id="power" aria-label="Log in or out"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 7.2a8 8 0 1 0 11.4 0"/></svg></button>
+        </div>
+        <div class="status"><span class="dot"></span><span id="stateTitle">Checking…</span></div>
+        <div class="netline" id="netline">&nbsp;</div>
+        <div class="stats-row">
+          <div class="stat"><div class="sv" id="leftBig">—</div><div class="sk" id="leftLabel">left today</div></div>
+          <div class="stat"><div class="sv" id="usedBig">—</div><div class="sk" id="usedLabel">used today</div></div>
+          <div class="stat"><div class="sv" id="updatedBig">—</div><div class="sk">updated</div></div>
+        </div>
+        <div class="detail" id="detail">&nbsp;</div>
+      </div>
+    </section>
+
+    <section class="view" id="view-usage">
+      <div class="page">
+        <h1>Usage</h1>
+        <p class="sub" id="usagePeriod">From the campus user portal</p>
+        <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+        <div class="stats-row left-align">
+          <div class="stat"><div class="sv" id="sLeft">—</div><div class="sk">left</div></div>
+          <div class="stat"><div class="sv" id="sUsed">—</div><div class="sk">used</div></div>
+          <div class="stat"><div class="sv" id="sCap">—</div><div class="sk">allowance</div></div>
+        </div>
+        <div class="muted small" id="usageUpdated">Not read yet</div>
+        <div class="note small" id="usageNote"></div>
+        <div class="row top-gap"><div><div class="row-t">Read usage after signing in</div><div class="row-s">Opens the user portal in the background with your login</div></div><label class="switch"><input type="checkbox" id="readUsage"><span></span></label></div>
+        <button class="btn" id="usageRefresh">Refresh usage</button>
+      </div>
+    </section>
+
+    <section class="view" id="view-account">
+      <div class="page">
+        <h1>Account</h1>
+        <p class="sub">Your campus portal login. The password goes straight into <span id="kcName">the system keychain</span>, never into a file.</p>
+        <div class="form">
+          <label>Username<input id="user" autocomplete="username" spellcheck="false" placeholder="e.g. 21bcs001"></label>
+          <label>Password<input id="pass" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+          <div class="actions"><button class="btn primary" id="saveLogin">Save</button><button class="btn ghost" id="forgetLogin">Forget</button></div>
+          <div class="note small" id="accountNote"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="page">
+        <h1>Settings</h1>
+        <div class="row"><div><div class="row-t">Auto-login</div><div class="row-s">Sign in by itself when you join the college Wi-Fi</div></div><label class="switch"><input type="checkbox" id="autoLogin"><span></span></label></div>
+        <div class="row"><div><div class="row-t">Start at login</div><div class="row-s">Open quietly in the tray when your computer starts</div></div><label class="switch"><input type="checkbox" id="startAtLogin"><span></span></label></div>
+        <div class="row"><div><div class="row-t">Theme</div></div>
+          <div class="seg" id="theme"><button data-v="light">Light</button><button data-v="dark">Dark</button><button data-v="system">System</button></div></div>
+        <details class="adv">
+          <summary>Advanced</summary>
+          <label>Portal address<input id="portal" spellcheck="false"></label>
+          <label>College Wi-Fi names (one per line)<textarea id="ssids" rows="2" spellcheck="false"></textarea></label>
+          <button class="btn" id="saveAdv">Save</button>
+          <div class="note small" id="advNote"></div>
+        </details>
+      </div>
+    </section>
+
+    <section class="view" id="view-about">
+      <div class="page center">
+        <img class="appicon" src="icon.png" alt="">
+        <h1>College WiFi</h1>
+        <p class="sub" id="ver">Version 1.0.0</p>
+        <p class="muted">Signs you in to the campus Wi-Fi portal automatically and shows the data you have left today. Checks only when your network changes, and every minute while you're on the college Wi-Fi.</p>
+        <p class="muted">No telemetry, no accounts, no ads. Your password stays in your system keychain.</p>
+        <p class="muted small">MIT licence · by Paradox · github.com/chinmays-tanx09/college-wifi</p>
+        <button class="btn ghost" id="quitBtn">Quit College WiFi</button>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

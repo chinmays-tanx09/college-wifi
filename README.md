@@ -8,6 +8,20 @@ Built for the Sophos (Cyberoam) captive portal used at many Indian colleges. It 
 
 > **Not affiliated with Sophos or with any college.** "Sophos" and "Cyberoam" are trademarks of their owners.
 
+## Desktop app (Windows, macOS, Linux) — new
+
+College WiFi now also runs on your laptop: the same auto sign-in, data ring and big on/off button, in a desktop window with a tray / menu-bar icon. Your password stays in the OS keychain.
+
+<p align="center"><img src="desktop/docs/light_home.png" width="420" alt="College WiFi desktop, light"> <img src="desktop/docs/dark_sidebar.png" width="420" alt="College WiFi desktop, dark"></p>
+
+| OS | Download |
+|---|---|
+| Windows 10/11 | [Installer (.exe)](release/desktop/College_WiFi_1.0.0_x64-setup.exe) · [portable .exe](https://gofile.io/d/5OLBop49) |
+| Linux | [.deb](https://gofile.io/d/Guv7rsVb) · [AppImage](https://gofile.io/d/tWcSOMcX) |
+| macOS (Apple silicon + Intel) | Universal .dmg on the [Releases page](https://github.com/chinmays-tanx09/college-wifi/releases) (built by GitHub Actions) |
+
+Details, privacy notes and build steps: [desktop/README.md](desktop/README.md).
+
 ## What it does
 
 - **Auto sign-in.** A foreground service listens for the Wi-Fi you saved. When Android flags a captive portal, it logs in straight away. There is no polling: nothing runs while you are idle.

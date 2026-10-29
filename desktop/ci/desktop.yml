@@ -1,0 +1,68 @@
+# Builds College WiFi Desktop for Windows, macOS (universal: Apple silicon + Intel) and Linux,
+# and attaches the installers to a GitHub Release named desktop-v<version>.
+# Runs when a tag like desktop-v1.0.0 is pushed, or by hand from the Actions tab (Run workflow).
+name: Desktop build
+
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux libraries
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './desktop/src-tauri -> target'
+
+      - name: Install the Tauri CLI
+        working-directory: desktop
+        run: npm install
+
+      - name: Unit tests (portal protocol + usage parsing)
+        working-directory: desktop
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tagName: desktop-v__VERSION__
+          releaseName: 'College WiFi Desktop v__VERSION__'
+          releaseBody: |
+            College WiFi for Windows, macOS and Linux.
+            Windows: the -setup.exe (or .msi). macOS: the universal .dmg (first open: right-click → Open, the app is not notarized). Linux: .AppImage or .deb.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
