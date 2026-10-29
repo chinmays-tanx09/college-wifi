@@ -12,7 +12,7 @@ Built for the Sophos (Cyberoam) captive portal used at many Indian colleges. It 
 
 - **Auto sign-in.** A foreground service listens for the Wi-Fi you saved. When Android flags a captive portal, it logs in straight away. There is no polling: nothing runs while you are idle.
 - **Several accounts.** If one login hits its device or data limit, the next one signs in.
-- **Daily data card (new in 5.2).**
+- **Daily data card (new in 5.2; v5.3 fixes the campus quota showing used and limit swapped).**
   - *Used today* is measured on the phone, only while it is on the campus Wi-Fi. With **Usage access** granted, the app reads Android's own Wi-Fi counter. Without it, it estimates from whole-phone counters.
   - *Left today* comes from the campus **Sophos User Portal** ("Internet usage", the CurrentDailyCycle table) when the app can read it. Otherwise it is worked out from a daily cap you set.
   - Also: a 7-day history, optional alerts at 80% and 100%, an optional line in the status notification, and a reset at local midnight.
@@ -63,3 +63,8 @@ The screenshots come from an Android emulator with demo numbers.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+
+## Download
+
+Latest: [College_WiFi_v5.3.apk](https://github.com/chinmays-tanx09/college-wifi/raw/main/release/College_WiFi_v5.3.apk) (installs over 5.2).
