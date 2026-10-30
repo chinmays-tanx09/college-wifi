@@ -1,0 +1,39 @@
+# Builds College WiFi Desktop for Windows on ARM (arm64: Snapdragon / Surface Pro X etc.)
+# and attaches the installers to the GitHub Release desktop-v<version>.
+name: Desktop build (Windows ARM64)
+
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-win-arm64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './desktop/src-tauri -> target'
+      - name: Install the Tauri CLI
+        working-directory: desktop
+        run: npm install
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tagName: desktop-v__VERSION__
+          releaseName: 'College WiFi Desktop v__VERSION__'
+          releaseDraft: false
+          prerelease: false
+          args: '--target aarch64-pc-windows-msvc'
