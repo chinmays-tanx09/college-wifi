@@ -206,32 +206,51 @@ pub fn live_path(user: &str, a: u128) -> String {
 
 #[derive(Debug)]
 pub enum PortalError {
-    /// Nothing answered (not on the campus network, or the portal is down).
+    /// Nothing answered (not on the campus network, the portal is down, or the request never left this computer).
+    /// Carries the reason in plain words, e.g. "no answer from 172.16.16.16:8090 (timed out)".
     Unreachable(String),
-    /// The portal answered, but with an HTTP error / redirect / page we cannot read.
-    Http(u16),
-    Unparseable(u16),
+    /// The portal answered, but with an HTTP error / redirect / page we cannot read. Carries a short excerpt.
+    Http(u16, String),
+    Unparseable(u16, String),
 }
 
 impl std::fmt::Display for PortalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PortalError::Unreachable(_) => write!(f, "Couldn't reach the college portal"),
-            PortalError::Http(c) => write!(f, "Portal HTTP {}", c),
-            PortalError::Unparseable(c) => write!(f, "Portal reply not recognised (HTTP {})", c),
+            PortalError::Unreachable(why) => write!(f, "Couldn't reach the portal: {}", why),
+            PortalError::Http(c, said) if said.is_empty() => write!(f, "The portal answered HTTP {} instead of a sign-in reply", c),
+            PortalError::Http(c, said) => write!(f, "The portal answered HTTP {} instead of a sign-in reply: \u{201c}{}\u{201d}", c, said),
+            PortalError::Unparseable(c, said) if said.is_empty() => write!(f, "The portal's reply wasn't a sign-in answer (HTTP {})", c),
+            PortalError::Unparseable(c, said) => write!(f, "The portal's reply wasn't a sign-in answer (HTTP {}): \u{201c}{}\u{201d}", c, said),
         }
     }
 }
 
+/// Same headers as the Android app's `Http` (a browser-like Accept, an honest user agent).
+pub const USER_AGENT: &str = "Mozilla/5.0 (Desktop) CollegeWiFi/1.1 ParadoxWiFi/5";
+const ACCEPT: &str = "text/html,application/xhtml+xml,application/xml,application/json;q=0.9,*/*;q=0.8";
+
+static VIA: std::sync::Mutex<Option<std::net::IpAddr>> = std::sync::Mutex::new(None);
+
+/// The local address the portal last answered on when the default route didn't reach it (None = default route).
+pub fn via() -> Option<std::net::IpAddr> { *VIA.lock().unwrap() }
+pub fn set_via(v: Option<std::net::IpAddr>) { *VIA.lock().unwrap() = v; }
+
 pub fn client(connect_ms: u64, read_ms: u64) -> reqwest::blocking::Client {
-    reqwest::blocking::Client::builder()
+    client_via(connect_ms, read_ms, via())
+}
+
+/// `via` = send from this local address (the Wi-Fi adapter's), the desktop twin of Android binding the request to
+/// the Wi-Fi network. Needed when a VPN, a phone hotspot or Ethernet owns the default route.
+pub fn client_via(connect_ms: u64, read_ms: u64, via: Option<std::net::IpAddr>) -> reqwest::blocking::Client {
+    let mut b = reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_millis(connect_ms))
         .timeout(Duration::from_millis(connect_ms + read_ms))
         .redirect(reqwest::redirect::Policy::none())
         .no_proxy()
-        .user_agent("Mozilla/5.0 (Desktop) CollegeWiFi/1.0")
-        .build()
-        .expect("http client")
+        .user_agent(USER_AGENT);
+    if via.is_some() { b = b.local_address(via); }
+    b.build().expect("http client")
 }
 
 fn read_capped(resp: reqwest::blocking::Response, cap: usize) -> String {
@@ -241,28 +260,140 @@ fn read_capped(resp: reqwest::blocking::Response, cap: usize) -> String {
     String::from_utf8_lossy(&buf).into_owned()
 }
 
+/// The deepest cause of a failed request, in plain words ("timed out", "connection refused", …).
+pub fn why(e: &reqwest::Error, base: &str) -> String {
+    use std::error::Error;
+    let mut chain = vec![e.to_string()];
+    let mut cur: Option<&(dyn Error + 'static)> = e.source();
+    while let Some(c) = cur { chain.push(c.to_string()); cur = c.source(); }
+    let all = chain.join(" | ").to_lowercase();
+    let at = host_port(base).map(|(h, p)| format!("{}:{}", h, p)).unwrap_or_else(|| base.to_string());
+    let plain = if e.is_timeout() || all.contains("timed out") || all.contains("10060") {
+        "no answer (timed out)".to_string()
+    } else if all.contains("refused") || all.contains("10061") {
+        "the connection was refused".to_string()
+    } else if all.contains("unreachable") || all.contains("no route") || all.contains("10051") || all.contains("10065") {
+        "no route to it from this computer".to_string()
+    } else if all.contains("dns") || all.contains("resolve") || all.contains("lookup") || all.contains("11001") {
+        "its name couldn't be looked up".to_string()
+    } else if all.contains("address not available") || all.contains("10049") {
+        "this computer's Wi-Fi address isn't usable yet".to_string()
+    } else if all.contains("reset") || all.contains("10054") || all.contains("closed") {
+        "the connection was dropped".to_string()
+    } else {
+        short_msg(chain.last().map(|s| s.as_str()).unwrap_or("unknown error"))
+    };
+    format!("{} at {}", plain, at)
+}
+
+/// Plain text of an HTML page (scripts and styles dropped), for reading a portal's notice.
+pub fn html_text(html: &str) -> String {
+    static S: OnceLock<Regex> = OnceLock::new();
+    static T: OnceLock<Regex> = OnceLock::new();
+    static E: OnceLock<Regex> = OnceLock::new();
+    let s = re(&S, r"(?is)<(script|style|noscript)[^>]*>.*?</(script|style|noscript)>").replace_all(html, " ");
+    let s = re(&T, r"(?s)<[^>]*>").replace_all(&s, " ");
+    let s = s.replace("&nbsp;", " ").replace("&amp;", "&").replace("&#39;", "'").replace("&quot;", "\"").replace("&lt;", "<").replace("&gt;", ">");
+    re(&E, r"\s+").replace_all(&s, " ").trim().to_string()
+}
+
+/// Android `Drivers.Sophos.pageVerdict` (v5.1): login.xml answered with an HTML page or a redirect instead of XML
+/// (seen when a quota runs out). A clear limit / expiry sentence on that page is a refusal of THIS account, so the
+/// failover moves on; anything else stays unreadable. Limits first: a block page that also says "validity" must not
+/// park the account.
+pub fn page_verdict(body: &str, location: &str) -> Option<Reply> {
+    let text = html_text(body);
+    let text: String = text.chars().take(2000).collect();
+    let loc = location.replace(['_', '-'], " ");
+    for t in [text.as_str(), loc.as_str()] {
+        let m = t.to_lowercase();
+        if m.is_empty() { continue; }
+        let hit = any(&m, QUOTA) || any(&m, SESSION) || m.contains("account has expired") || m.contains("account expired");
+        if hit {
+            let said = if t == loc { format!("Portal redirected to {}", location) } else { short_msg(t) };
+            return Some(Reply::new("LOGIN", &said, 200));
+        }
+    }
+    None
+}
+
 /// POST to a fixed path on the portal. pass == None omits the password field (logout).
 pub fn post(base: &str, path: &str, mode: &str, user: &str, pass: Option<&str>, connect_ms: u64, read_ms: u64) -> Result<Reply, PortalError> {
+    post_via(base, path, mode, user, pass, connect_ms, read_ms, via())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn post_via(base: &str, path: &str, mode: &str, user: &str, pass: Option<&str>, connect_ms: u64, read_ms: u64, via: Option<std::net::IpAddr>) -> Result<Reply, PortalError> {
     let body = form_body(mode, user, pass, now_ms());
-    let resp = client(connect_ms, read_ms)
+    let c = client_via(connect_ms, read_ms, via);
+    let resp = c
         .post(format!("{}{}", base, path))
         .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+        .header("Accept", ACCEPT)
         .header("Referer", format!("{}/httpclient.html", base))
         .body(body)
         .send()
-        .map_err(|e| PortalError::Unreachable(e.to_string()))?;
+        .map_err(|e| PortalError::Unreachable(why(&e, base)))?;
     let http = resp.status().as_u16();
-    let mut text = read_capped(resp, 65536);
-    if let Some(p) = pass { if !p.is_empty() { text = text.replace(p, "[redacted]"); } }
+    let location = resp.headers().get("location").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+    let scrub = |s: String| match pass { Some(p) if !p.is_empty() => s.replace(p, "[redacted]"), _ => s };
+    let text = scrub(read_capped(resp, 65536));
     match parse(&text, http) {
         Some(r) => Ok(fill(Some(r), user).unwrap()),
-        None if http >= 300 => Err(PortalError::Http(http)),
-        None => Err(PortalError::Unparseable(http)),
+        None => {
+            // a redirect or an HTML page: follow it (twice at most, GET, as Android does) and read its notice
+            let mut page = text.clone();
+            let mut loc = location.clone();
+            let mut hops = 0;
+            while (300..400).contains(&http) && !loc.is_empty() && hops < 2 {
+                hops += 1;
+                let next = url::Url::parse(base).ok().and_then(|b| b.join(&loc).ok());
+                let Some(next) = next else { break };
+                match c.get(next.as_str()).header("Accept", ACCEPT).send() {
+                    Ok(r2) => {
+                        let st = r2.status().as_u16();
+                        let l2 = r2.headers().get("location").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+                        page = scrub(read_capped(r2, 65536));
+                        if (300..400).contains(&st) && !l2.is_empty() { loc = l2; } else { break; }
+                    }
+                    Err(_) => break,
+                }
+            }
+            if let Some(r) = page_verdict(&page, &location) { return Ok(r); }
+            let said: String = html_text(&page).chars().take(120).collect();
+            let said = if said.is_empty() && !location.is_empty() { format!("redirected to {}", short_msg(&location)) } else { said };
+            if http >= 300 { Err(PortalError::Http(http, said)) } else { Err(PortalError::Unparseable(http, said)) }
+        }
     }
 }
 
 pub fn login(base: &str, user: &str, pass: &str) -> Result<Reply, PortalError> {
-    post(base, "/login.xml", "191", user, Some(pass), 5000, 8000)
+    login_via(base, user, pass, via())
+}
+
+pub fn login_via(base: &str, user: &str, pass: &str, via: Option<std::net::IpAddr>) -> Result<Reply, PortalError> {
+    post_via(base, "/login.xml", "191", user, Some(pass), 5000, 8000, via)
+}
+
+/// One sign-in try on a given local address with a short connect wait (the fallback across adapters).
+pub fn login_quick(base: &str, user: &str, pass: &str, via: Option<std::net::IpAddr>) -> Result<Reply, PortalError> {
+    post_via(base, "/login.xml", "191", user, Some(pass), 2500, 8000, via)
+}
+
+/// This computer's own private IPv4 addresses (the Wi-Fi adapter's among them), for `client_via`.
+pub fn local_ipv4s() -> Vec<std::net::IpAddr> {
+    let mut out = Vec::new();
+    if let Ok(list) = if_addrs::get_if_addrs() {
+        for i in list {
+            if let std::net::IpAddr::V4(v4) = i.ip() {
+                if v4.is_loopback() || v4.is_link_local() || v4.is_unspecified() { continue; }
+                if !v4.is_private() { continue; }
+                let ip = std::net::IpAddr::V4(v4);
+                if !out.contains(&ip) { out.push(ip); }
+            }
+        }
+    }
+    out
 }
 
 /// Logout (mode 193, username only): /logout.xml first, then /login.xml (as Drivers.Sophos.logout).
@@ -302,15 +433,44 @@ pub fn is_online(probe: &str, code: u16, body: &str) -> bool {
 
 /// Does the open internet answer? In = 204, Out = something (the portal) intercepted it, Unknown = no answer.
 pub fn internet() -> Live {
+    probe().0
+}
+
+/// The probe, plus where an intercepting portal sent us (its Location or a meta/JS redirect), when it did.
+pub fn probe() -> (Live, Option<String>) {
     let c = client(2500, 3500);
     for p in PROBES.iter().take(2) {
         if let Ok(r) = c.get(*p).send() {
             let code = r.status().as_u16();
+            let loc = r.headers().get("location").and_then(|v| v.to_str().ok()).map(|s| s.to_string());
             let body = read_capped(r, 16384);
-            return if is_online(p, code, &body) { Live::In } else { Live::Out };
+            if is_online(p, code, &body) { return (Live::In, None); }
+            let to = loc.or_else(|| page_redirect(&body)).and_then(|l| url::Url::parse(p).ok()?.join(&l).ok()).map(|u| u.to_string());
+            return (Live::Out, to);
         }
     }
-    Live::Unknown
+    (Live::Unknown, None)
+}
+
+/// A meta refresh or `location = "…"` script redirect in an intercept page.
+pub fn page_redirect(body: &str) -> Option<String> {
+    static M: OnceLock<Regex> = OnceLock::new();
+    static J: OnceLock<Regex> = OnceLock::new();
+    if let Some(c) = re(&M, r#"(?is)<meta[^>]+http-equiv\s*=\s*["']?refresh["']?[^>]*content\s*=\s*["']?\s*\d*\s*;?\s*url\s*=\s*([^"'>\s]+)"#).captures(body) { return Some(c[1].to_string()); }
+    if let Some(c) = re(&J, r#"(?is)(?:window\.|document\.)?location(?:\.href)?\s*=\s*["']([^"']+)["']"#).captures(body) { return Some(c[1].to_string()); }
+    None
+}
+
+/// The Sophos portal an intercepted probe points at (port 8090, /httpclient.html, login.xml), as a base URL.
+pub fn sophos_base_from(url: &str) -> Option<String> {
+    let u = url::Url::parse(url).ok()?;
+    let host = u.host_str()?;
+    let port = u.port_or_known_default()?;
+    let lower = url.to_lowercase();
+    let looks = port == 8090 || lower.contains("httpclient.html") || lower.contains("login.xml") || lower.contains("cyberoam") || lower.contains("sophos");
+    if !looks { return None; }
+    let port = if port == 8090 || u.port().is_some() { port } else { 8090 };
+    Some(format!("http://{}:{}", host, port))
 }
 
 pub fn host_port(base: &str) -> Option<(String, u16)> {
@@ -444,5 +604,135 @@ mod tests {
         assert!(!looks_signed_in("You are not signed in"));
         assert_eq!(host_port("http://172.16.16.16:8090"), Some(("172.16.16.16".into(), 8090)));
         assert_eq!(short_msg(&"a ".repeat(100)).chars().count(), 138);
+    }
+
+    #[test]
+    fn page_verdict_reads_block_pages_like_android() {
+        let q = page_verdict("<html><body><h1>Access denied</h1><p>Your data transfer limit has been exceeded.</p><script>var quota=1</script></body></html>", "").unwrap();
+        assert_eq!(verdict(&q).0, Kind::LimitQuota);
+        let s = page_verdict("<p>You have reached Maximum Login Limit.</p>", "").unwrap();
+        assert_eq!(verdict(&s).0, Kind::LimitSession);
+        let r = page_verdict("", "http://172.16.16.16:8090/quota_exceeded.html").unwrap();
+        assert_eq!(verdict(&r).0, Kind::LimitQuota);
+        assert!(r.message.starts_with("Portal redirected to"));
+        assert!(page_verdict("<html><body>Welcome to the portal</body></html>", "").is_none());
+        assert_eq!(html_text("<style>x{}</style><b>Hi</b>&nbsp;there<script>1</script>"), "Hi there");
+    }
+
+    #[test]
+    fn errors_say_which_failure_it_was() {
+        let u = PortalError::Unreachable("no answer (timed out) at 172.16.16.16:8090".into()).to_string();
+        assert!(u.starts_with("Couldn't reach the portal: no answer"), "{}", u);
+        let h = PortalError::Http(302, "redirected to /x".into()).to_string();
+        assert!(h.contains("HTTP 302") && h.contains("redirected"));
+        assert!(!PortalError::Unparseable(200, String::new()).to_string().contains('\u{201c}'));
+    }
+
+    #[test]
+    fn portal_discovery_from_an_intercepted_probe() {
+        assert_eq!(sophos_base_from("http://172.16.16.16:8090/httpclient.html?url=x").as_deref(), Some("http://172.16.16.16:8090"));
+        assert_eq!(sophos_base_from("http://10.10.0.1:8090/").as_deref(), Some("http://10.10.0.1:8090"));
+        assert_eq!(sophos_base_from("https://gw.campus.in/httpclient.html").as_deref(), Some("http://gw.campus.in:8090"));
+        assert_eq!(sophos_base_from("http://login.example.com/portal"), None);
+        assert_eq!(page_redirect("<meta http-equiv=\"refresh\" content=\"0; url=http://172.16.16.16:8090/httpclient.html\">").as_deref(), Some("http://172.16.16.16:8090/httpclient.html"));
+        assert_eq!(page_redirect("<script>window.location=\"http://1.2.3.4:8090/\"</script>").as_deref(), Some("http://1.2.3.4:8090/"));
+        assert_eq!(page_redirect("<html>hi</html>"), None);
+    }
+
+    /// A one-shot HTTP server on 127.0.0.1 that answers each request with the next canned reply and hands back
+    /// what it received.
+    fn mock(replies: Vec<String>) -> (String, std::sync::mpsc::Receiver<String>) {
+        use std::io::{Read, Write};
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", l.local_addr().unwrap());
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for reply in replies {
+                let Ok((mut s, _)) = l.accept() else { return };
+                s.set_read_timeout(Some(Duration::from_secs(3))).ok();
+                let mut buf = vec![0u8; 16384];
+                let mut got = Vec::new();
+                loop {
+                    let n = s.read(&mut buf).unwrap_or(0);
+                    if n == 0 { break; }
+                    got.extend_from_slice(&buf[..n]);
+                    let t = String::from_utf8_lossy(&got).to_string();
+                    if let Some(h) = t.find("\r\n\r\n") {
+                        let len = t[..h].lines().find_map(|l| l.to_lowercase().strip_prefix("content-length:").map(|v| v.trim().parse::<usize>().unwrap_or(0))).unwrap_or(0);
+                        if got.len() >= h + 4 + len { break; }
+                    }
+                }
+                let _ = tx.send(String::from_utf8_lossy(&got).to_string());
+                let _ = s.write_all(reply.as_bytes());
+            }
+        });
+        (base, rx)
+    }
+
+    fn resp(code: &str, headers: &str, body: &str) -> String {
+        format!("HTTP/1.1 {}\r\nContent-Length: {}\r\nConnection: close\r\n{}\r\n{}", code, body.len(), headers, body)
+    }
+
+    #[test]
+    fn login_over_the_wire_like_android() {
+        let ok = "<?xml version='1.0' ?><requestresponse><status><![CDATA[LIVE]]></status><message><![CDATA[You are signed in as {username}]]></message></requestresponse>";
+        let (base, rx) = mock(vec![resp("200 OK", "Content-Type: text/xml\r\n", ok)]);
+        let r = login_via(&base, "21bcs001", "p@ss word&=", None).unwrap();
+        assert_eq!(verdict(&r), (Kind::Ok, "You are signed in as 21bcs001".to_string()));
+        let req = rx.recv().unwrap();
+        assert!(req.starts_with("POST /login.xml HTTP/1.1\r\n"), "{}", req);
+        let lower = req.to_lowercase();
+        assert!(lower.contains("content-type: application/x-www-form-urlencoded; charset=utf-8"));
+        assert!(lower.contains(&format!("referer: {}/httpclient.html", base)));
+        let body = req.split("\r\n\r\n").nth(1).unwrap();
+        assert!(body.starts_with("mode=191&username=21bcs001&password=p%40ss+word%26%3D&a="), "{}", body);
+        assert!(body.ends_with("&producttype=0"));
+    }
+
+    #[test]
+    fn wrong_password_is_the_portal_words_not_a_network_error() {
+        let no = "<requestresponse><status>LOGIN</status><message><![CDATA[Login failed. Invalid user name/password. Please contact the administrator.]]></message></requestresponse>";
+        let (base, _rx) = mock(vec![resp("200 OK", "", no)]);
+        let r = login_via(&base, "u", "secret-pw", None).unwrap();
+        let (k, words) = verdict(&r);
+        assert_eq!(k, Kind::WrongPassword);
+        assert!(words.contains("Invalid user name/password"));
+    }
+
+    #[test]
+    fn redirect_to_a_block_page_is_a_quota_refusal() {
+        let (base, _rx) = mock(vec![
+            resp("302 Found", "Location: /blocked.html\r\n", ""),
+            resp("200 OK", "Content-Type: text/html\r\n", "<html><body><p>Your data transfer limit has been exceeded.</p></body></html>"),
+        ]);
+        let r = login_via(&base, "u", "pw", None).unwrap();
+        assert_eq!(verdict(&r).0, Kind::LimitQuota);
+    }
+
+    #[test]
+    fn an_unreadable_page_says_what_it_was() {
+        let (base, _rx) = mock(vec![resp("200 OK", "", "<html><body>Under maintenance</body></html>")]);
+        match login_via(&base, "u", "pw", None) {
+            Err(e @ PortalError::Unparseable(200, _)) => assert!(e.to_string().contains("Under maintenance"), "{}", e),
+            other => panic!("{:?}", other),
+        }
+    }
+
+    #[test]
+    fn nothing_listening_is_unreachable_with_a_reason() {
+        let port = { let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap(); l.local_addr().unwrap().port() };
+        let base = format!("http://127.0.0.1:{}", port);
+        match login_via(&base, "u", "pw", None) {
+            Err(PortalError::Unreachable(why)) => assert!((why.contains("refused") || why.contains("timed out")) && why.contains(&format!("127.0.0.1:{}", port)), "{}", why),
+            other => panic!("{:?}", other),
+        }
+        assert!(!local_ipv4s().iter().any(|ip| ip.is_loopback()));
+    }
+
+    #[test]
+    fn live_check_against_a_mock() {
+        let (base, rx) = mock(vec![resp("200 OK", "", "<?xml version='1.0' ?><requestresponse><ack><![CDATA[ack]]></ack></requestresponse>")]);
+        assert_eq!(live(&base, "21bcs001"), Live::In);
+        assert!(rx.recv().unwrap().starts_with("GET /live?mode=192&username=21bcs001&a="));
     }
 }

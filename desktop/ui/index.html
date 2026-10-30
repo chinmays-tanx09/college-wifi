@@ -17,13 +17,13 @@
     <nav class="nav">
       <button class="nav-item active" data-view="home"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.6a10 10 0 0 1 14 0"/><path d="M8.5 16.3a5 5 0 0 1 7 0"/><circle cx="12" cy="19.6" r="0.6"/></svg><span>Status</span></button>
       <button class="nav-item" data-view="usage"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg><span>Usage</span></button>
-      <button class="nav-item" data-view="account"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg><span>Account</span></button>
+      <button class="nav-item" data-view="accounts"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></svg><span>Accounts</span><span class="nav-count" id="navCount"></span></button>
       <button class="nav-item" data-view="settings"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Settings</span></button>
       <button class="nav-item" data-view="about"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r="0.6"/></svg><span>About</span></button>
     </nav>
-    <div class="sb-foot">
+    <div class="sb-foot" id="sbFoot" role="button" tabindex="0" title="Accounts">
       <div class="avatar" id="avatar"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></div>
-      <div class="who"><div class="who-name" id="whoName">No login saved</div><div class="who-sub" id="whoSub">Account → add your login</div></div>
+      <div class="who"><div class="who-name" id="whoName">No login saved</div><div class="who-sub" id="whoSub">Accounts → add your login</div></div>
     </div>
   </aside>
 
@@ -72,16 +72,21 @@
       </div>
     </section>
 
-    <section class="view" id="view-account">
+    <section class="view" id="view-accounts">
       <div class="page">
-        <h1>Account</h1>
-        <p class="sub">Your campus portal login. The password goes straight into <span id="kcName">the system keychain</span>, never into a file.</p>
-        <div class="form">
-          <label>Username<input id="user" autocomplete="username" spellcheck="false" placeholder="e.g. 21bcs001"></label>
-          <label>Password<input id="pass" type="password" autocomplete="current-password" placeholder="••••••••"></label>
-          <div class="actions"><button class="btn primary" id="saveLogin">Save</button><button class="btn ghost" id="forgetLogin">Forget</button></div>
-          <div class="note small" id="accountNote"></div>
+        <h1>Accounts</h1>
+        <p class="sub">Save several portal logins. The first is your primary and is tried first; if the portal refuses it or it hits a limit, the next one signs in by itself. Passwords go straight into <span id="kcName">the system keychain</span>, never into a file.</p>
+        <div class="acc-list" id="accList"></div>
+        <div class="acc-empty muted" id="accEmpty">No login saved yet.</div>
+        <button class="btn" id="addAcc"><span class="plus">+</span> Add account</button>
+        <div class="form acc-form" id="accForm" hidden>
+          <div class="form-title" id="accFormTitle">Add account</div>
+          <label>Username<input id="user" autocomplete="off" spellcheck="false" placeholder="e.g. 21bcs001"></label>
+          <label>Password<input id="pass" type="password" autocomplete="new-password" placeholder="••••••••"></label>
+          <div class="actions"><button class="btn primary" id="saveAcc">Save</button><button class="btn ghost" id="cancelAcc">Cancel</button></div>
         </div>
+        <div class="note small" id="accountNote"></div>
+        <p class="muted small top-gap">A wrong password is tried once and then parked until you edit it, so the portal never locks you out. A device limit is retried on the next Wi-Fi connect (or after 15 min); a data limit after midnight. “Use now” signs out the current account and signs in with that one.</p>
       </div>
     </section>
 
@@ -99,6 +104,14 @@
           <button class="btn" id="saveAdv">Save</button>
           <div class="note small" id="advNote"></div>
         </details>
+        <h2 class="sec">Troubleshooting</h2>
+        <div class="row"><div><div class="row-t">Save a log file</div><div class="row-s" id="logPath">Keeps the connection log on disk too (no passwords)</div></div><label class="switch"><input type="checkbox" id="logFile"><span></span></label></div>
+        <details class="adv" id="logBox">
+          <summary>Connection log</summary>
+          <textarea id="logText" rows="12" readonly spellcheck="false"></textarea>
+          <div class="actions"><button class="btn" id="copyLog">Copy</button><button class="btn ghost" id="reloadLog">Refresh</button></div>
+          <div class="note small" id="logNote"></div>
+        </details>
       </div>
     </section>
 
@@ -106,9 +119,9 @@
       <div class="page center">
         <img class="appicon" src="icon.png" alt="">
         <h1>College WiFi</h1>
-        <p class="sub" id="ver">Version 1.0.0</p>
+        <p class="sub" id="ver">Version 1.1.0</p>
         <p class="muted">Signs you in to the campus Wi-Fi portal automatically and shows the data you have left today. Checks only when your network changes, and every minute while you're on the college Wi-Fi.</p>
-        <p class="muted">No telemetry, no accounts, no ads. Your password stays in your system keychain.</p>
+        <p class="muted">Several logins with automatic fallback, like the Android app. No telemetry, no sign-up, no ads. Passwords stay in your system keychain.</p>
         <p class="muted small">MIT licence · by Paradox · github.com/chinmays-tanx09/college-wifi</p>
         <button class="btn ghost" id="quitBtn">Quit College WiFi</button>
       </div>

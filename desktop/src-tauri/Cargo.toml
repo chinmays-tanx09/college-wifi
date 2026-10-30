@@ -1,6 +1,6 @@
 [package]
 name = "college-wifi"
-version = "1.0.0"
+version = "1.1.0"
 description = "College WiFi: auto sign-in for the campus captive portal"
 authors = ["Paradox"]
 license = "MIT"
@@ -29,6 +29,7 @@ futures = "0.3"
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 url = "2"
+if-addrs = "0.15"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }

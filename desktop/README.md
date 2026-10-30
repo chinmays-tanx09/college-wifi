@@ -6,22 +6,27 @@ The desktop version of the College WiFi Android app. It signs you in to the camp
 
 <p align="center"><img src="docs/light_home.png" width="440" alt="Light"> <img src="docs/dark_sidebar.png" width="440" alt="Dark, sidebar open"></p>
 
-## Download (v1.0.0)
+## Download (v1.1.0)
+
+Every installer is on the [desktop-v1.1.0 release](https://github.com/chinmays-tanx09/college-wifi/releases/tag/desktop-v1.1.0), built by GitHub Actions:
 
 | OS | File | Notes |
 |---|---|---|
-| Windows 10/11 (x64) | [College_WiFi_1.0.0_x64-setup.exe](../release/desktop/College_WiFi_1.0.0_x64-setup.exe) | Installer for your user only, no admin needed. Not code-signed, so SmartScreen may say "Windows protected your PC": click **More info → Run anyway**. Uses the Edge WebView2 that ships with Windows. |
-| Windows (portable) | [College_WiFi_1.0.0_windows_x64_portable.exe](https://gofile.io/d/5OLBop49) | One file, no install. |
-| Linux (Debian/Ubuntu) | [College_WiFi_1.0.0_amd64.deb](https://gofile.io/d/Guv7rsVb) | `sudo apt install ./College_WiFi_1.0.0_amd64.deb` |
-| Linux (any distro) | [College_WiFi_1.0.0_linux_x86_64.AppImage](https://gofile.io/d/tWcSOMcX) | `chmod +x` it and run. |
-| macOS 10.15+ (Apple silicon + Intel) | Universal .dmg, from the [Releases page](https://github.com/chinmays-tanx09/college-wifi/releases) | Built by GitHub Actions. Not notarized: the first time, right-click the app → **Open**. |
+| Windows 10/11 (x64) | `College.WiFi_1.1.0_x64-setup.exe` (or the `.msi`) | Installs for your user only, no admin needed. Not code-signed, so SmartScreen may say "Windows protected your PC": click **More info → Run anyway**. Updating from 1.0.0 keeps your saved login (it becomes account 1). |
+| Linux | `.AppImage` (any distro) or `.deb` (Debian/Ubuntu) | `chmod +x` the AppImage and run it, or `sudo apt install ./….deb`. |
+| macOS 10.15+ (Apple silicon + Intel) | Universal `.dmg` | Not notarized: the first time, right-click the app → **Open**. |
 
-The .deb, AppImage and portable .exe are on file-sharing links for now; once the GitHub Actions build has run, every file is also on the [Releases page](https://github.com/chinmays-tanx09/college-wifi/releases).
+## What's new in 1.1.0
+
+- **Several accounts, like the Android app.** Accounts page in the sidebar: add, edit, remove, reorder. The first account is your primary and is tried first; if the portal refuses it or it hits a limit, the next one signs in by itself. A wrong password is tried once and then parked until you edit it (no lockout loop). A device/login limit is retried on the next Wi-Fi connect or after 15 min, and a data limit after midnight. "Use now" signs the current account out and signs in with the one you picked. If the portal says you're signed in but still blocks the internet (data used up), it moves on to the next account.
+- **Sign-in fixes.** It no longer shows "Connected" just because the portal says your username is live (for example, signed in on your phone): it checks that this computer really has the internet, and signs in if not. If a VPN, phone hotspot or Ethernet owns the default route, it retries the portal from the Wi-Fi adapter's own address. It re-checks every minute, so a missed network event can't leave it stuck on "Not on college Wi-Fi". If the portal moves, it finds the new address from the connectivity check's redirect.
+- **Clear errors.** "Couldn't reach the portal: <why>" (timed out, refused, no route…) is now separate from "Portal rejected the login" with the portal's own words. When login.xml answers with a block page or a redirect, the page's text is read (as on Android).
+- **Connection log.** Settings → Troubleshooting → Connection log (Copy button), and an optional log file. It never contains passwords.
 
 ## What it does
 
 - **One big button.** The ring shows today's data used against your allowance; the button in the middle logs you in or out of the portal.
-- **Auto-login.** It reacts to network changes (the OS tells it when an interface comes up), checks whether you're on the college network, and signs in if the portal is blocking you. While you're on the college network it also looks once a minute (a tiny "still signed in?" request). Off campus it does nothing.
+- **Auto-login.** It reacts to network changes (the OS tells it when an interface comes up), checks whether you're on the college network, and signs in if the portal is blocking you. While you're on the college network it also looks once a minute (a tiny "still signed in?" request plus the standard connectivity check). Off campus the minute check is only the Wi-Fi name and a TCP knock on the portal; nothing is sent.
 - **Recognises the college network** by its Wi-Fi name (default `IIIT DHARWAD-STUDENT`; editable) or, when the OS won't share the name, by whether the portal (`172.16.16.16:8090`) answers.
 - **Data left today**, read from the campus Sophos User Portal ("Internet usage", the daily cycle table), the same way the Android app reads it.
 - **Tray / menu bar icon** with Log in, Log out, Open and Quit. Closing the window keeps it running in the tray.
