@@ -1,0 +1,26 @@
+name: Attach Android APK to release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (must already exist)
+        required: true
+      file:
+        description: APK path in the repo
+        required: true
+      sha256:
+        description: Expected SHA-256 of the APK
+        required: true
+permissions:
+  contents: write
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SHA-256
+        run: echo "${{ inputs.sha256 }}  ${{ inputs.file }}" | sha256sum -c -
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" "${{ inputs.file }}" --clobber
